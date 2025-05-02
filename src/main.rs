@@ -2,9 +2,15 @@
 // extern crate env_logger;
 extern crate spider;
 
+use scraper::{Html, Selector};
 // use env_logger::Env;
 use spider::tokio;
 use spider::website::Website;
+
+mod preprocessor;
+mod web_scraper;
+use preprocessor::chunks::content_to_chunks;
+use web_scraper::scrape::{crawl_website, parse_website};
 
 #[tokio::main]
 async fn main() {
@@ -16,26 +22,13 @@ async fn main() {
     //
     // env_logger::init_from_env(env);
     let target = "https://spider.cloud";
-    let mut website: Website = Website::new(target);
-    website.configuration.respect_robots_txt = true;
-    website.configuration.delay = 15; // Defaults to 250 ms
-    website.configuration.user_agent = Some(Box::new("SpiderBot".into())); // Defaults to spider/x.y.z, where x.y.z is the library version
+    let website = crawl_website(&target).await;
+    let content = parse_website(website).unwrap();
+    let chunks = content_to_chunks(&content);
 
-    website.scrape().await;
-
-    let mut lock = stdout().lock();
-
-    let separator = "-".repeat(target.len());
-
-    for page in website.get_pages().unwrap().iter() {
-        writeln!(
-            lock,
-            "{}\n{}\n\n{}\n\n{}",
-            separator,
-            page.get_url(),
-            page.get_html(),
-            separator
-        )
-        .unwrap();
+    for c in chunks {
+        println!("{:?}", c);
+        println!();
+        println!();
     }
 }
