@@ -15,6 +15,8 @@ use serde_json::json;
 use spider::hashbrown::HashSet;
 use tokio::time::Duration;
 
+use crate::web_scraper::scrape::{crawl_website, parse_website};
+
 pub struct Orchestrator {
     client: Client<OpenAIConfig>,
     assistant_id: String,
@@ -38,7 +40,22 @@ impl Orchestrator {
         })
     }
 
-    pub async fn upload_content(&mut self, filename: &str, content: String) -> Result<OpenAIFile> {
+    pub async fn query_url(&mut self, url: &str, query: &str) -> Result<String> {
+        let website = crawl_website(url).await;
+        let content = parse_website(website).unwrap();
+
+        let file = self
+            .upload_content(&format!("{}.txt", url), content)
+            .await?;
+        let thread = self.create_thread().await?;
+
+        self.user_query_to_thread(&thread.id, query, &file.id)
+            .await?;
+
+        self.get_assistant_response_for_thread(&thread.id).await
+    }
+
+    async fn upload_content(&mut self, filename: &str, content: String) -> Result<OpenAIFile> {
         println!(
             "Uploading file '{}' ({} bytes) to OpenAI...",
             filename,

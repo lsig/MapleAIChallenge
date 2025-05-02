@@ -1693,8 +1693,10 @@ dependencies = [
  "reqwest",
  "scraper",
  "serde",
+ "serde_json",
  "spider",
  "text-splitter",
+ "tokio",
 ]
 
 [[package]]
