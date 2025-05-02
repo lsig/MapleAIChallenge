@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, response::IntoResponse};
 use reqwest::StatusCode;
 
-use crate::api::{AppState, ErrorResponse, QueryRequest, QueryResponse};
+use super::model::{AppState, ErrorResponse, QueryRequest, QueryResponse};
 
 pub async fn handle_query(
     State(state): State<AppState>,

@@ -1,31 +1,27 @@
 extern crate spider;
 use anyhow::{Context, Result};
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{Router, routing::post};
 
 mod api;
-mod endpoints;
 mod rag;
 mod web_scraper;
 
-use api::AppState;
+use api::model::AppState;
+use api::query::handle_query;
 use dotenvy::dotenv;
-use endpoints::query::handle_query;
 use rag::open_ai::Orchestrator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().context("Could not find .env")?;
 
-    // Create the orchestrator instance (handles its own init failures)
     let orchestrator = Orchestrator::new()
         .await
-        .expect("Failed to initialize Orchestrator"); // Or handle error gracefully
+        .expect("Failed to initialize Orchestrator");
 
-    // Create the shared state
     let app_state = AppState::new(orchestrator);
-    // Build the Axum application router (define routes next)
     let app = Router::new()
-        .route("/query", post(handle_query)) // Define POST endpoint
+        .route("/query", post(handle_query))
         // Add CORS layer if needed for browser clients
         // .layer(tower_http::cors::CorsLayer::permissive())
         // Add tracing layer

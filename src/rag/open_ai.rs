@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::format;
 
 use anyhow::{Context, Result, bail};
 use async_openai::Client;
@@ -52,8 +51,8 @@ impl Orchestrator {
         let file = self
             .upload_content(&format!("{}.txt", host), content)
             .await?;
-        let thread = self.create_thread().await?;
 
+        let thread = self.create_thread().await?;
         self.user_query_to_thread(&thread.id, query, &file.id)
             .await?;
 
