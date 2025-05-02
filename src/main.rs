@@ -5,7 +5,7 @@ use spider::tokio;
 mod rag;
 mod web_scraper;
 use dotenvy::dotenv;
-use rag::{embeddings::openai_embeddings, preprocessing::content_to_chunks};
+use rag::{embeddings, preprocessing::content_to_chunks};
 use web_scraper::scrape::{crawl_website, parse_website};
 
 #[tokio::main]

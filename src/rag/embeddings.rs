@@ -3,7 +3,8 @@ use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
     AssistantObject, AssistantTools, CreateAssistantRequestArgs, CreateFileRequestArgs,
-    CreateThreadRequestArgs, FileInput, FilePurpose, OpenAIFile, ThreadObject,
+    CreateMessageRequestArgs, CreateThreadRequestArgs, FileInput, FilePurpose, MessageAttachment,
+    MessageAttachmentTool, MessageObject, MessageRole, OpenAIFile, ThreadObject,
 };
 
 use bytes::Bytes;
@@ -89,4 +90,42 @@ pub async fn create_thread(client: &Client<OpenAIConfig>) -> Result<ThreadObject
 
     println!("Successfully created thread. Thread ID: {}", thread.id);
     Ok(thread)
+}
+
+pub async fn user_query_to_thread(
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+    user_query: &str,
+    file_id: &str,
+) -> Result<MessageObject> {
+    println!(
+        "Adding message to thread '{}' with file attachment '{}'...",
+        thread_id, file_id
+    );
+    println!("  User Query: '{}'", user_query);
+
+    let attachment = MessageAttachment {
+        file_id: file_id.to_string(),
+        tools: vec![MessageAttachmentTool::FileSearch],
+    };
+
+    let message_request = CreateMessageRequestArgs::default()
+        .role(MessageRole::User)
+        .content(user_query)
+        .attachments(vec![attachment])
+        .build()
+        .context("Failed to build create message request")?;
+
+    let message_object = client
+        .threads()
+        .messages(thread_id)
+        .create(message_request)
+        .await
+        .context("OpenAI message creation API call failed")?;
+
+    println!(
+        "Successfully added message {} to thread {}.",
+        message_object.id, thread_id
+    );
+    Ok(message_object)
 }
