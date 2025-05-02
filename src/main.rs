@@ -3,7 +3,6 @@ use std::io::{self, Write};
 
 use anyhow::{Context, Result};
 
-mod api;
 mod rag;
 mod web_scraper;
 
