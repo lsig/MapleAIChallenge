@@ -3,11 +3,14 @@ use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
     AssistantObject, AssistantTools, CreateAssistantRequestArgs, CreateFileRequestArgs,
-    CreateMessageRequestArgs, CreateThreadRequestArgs, FileInput, FilePurpose, MessageAttachment,
-    MessageAttachmentTool, MessageObject, MessageRole, OpenAIFile, ThreadObject,
+    CreateMessageRequestArgs, CreateRunRequestArgs, CreateThreadRequestArgs, FileInput,
+    FilePurpose, MessageAttachment, MessageAttachmentTool, MessageContent, MessageObject,
+    MessageRole, OpenAIFile, RunObject, RunStatus, ThreadObject,
 };
 
 use bytes::Bytes;
+use serde_json::json;
+use tokio::time::Duration;
 
 pub async fn upload_content_as_file(
     client: &Client<OpenAIConfig>,
@@ -128,4 +131,142 @@ pub async fn user_query_to_thread(
         message_object.id, thread_id
     );
     Ok(message_object)
+}
+
+pub async fn get_assistant_response_for_thread(
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+    assistant_id: &str,
+) -> Result<String> {
+    println!(
+        "Starting run for Assistant '{}' on Thread '{}'",
+        assistant_id, thread_id
+    );
+
+    let run_request = CreateRunRequestArgs::default()
+        .assistant_id(assistant_id)
+        .build()
+        .context("Failed to build create run request")?;
+
+    let run = client
+        .threads()
+        .runs(thread_id)
+        .create(run_request)
+        .await
+        .context("OpenAI run creation API call failed")?;
+
+    let run_id = run.id.clone();
+    println!("Run created: {}. Initial Status: {:?}", run_id, run.status);
+
+    let completed_run = poll_run_completion(client, thread_id, &run_id)
+        .await
+        .context(format!("Polling failed for run {}", run_id))?;
+
+    println!("Run {} completed successfully.", completed_run.id);
+
+    let response_text = get_latest_assistant_response(client, thread_id)
+        .await
+        .context(format!(
+            "Failed to get final response from thread {}",
+            thread_id
+        ))?;
+
+    println!("Assistant Response Retrieved.");
+    Ok(response_text)
+}
+
+async fn poll_run_completion(
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+    run_id: &str,
+) -> Result<RunObject> {
+    let mut attempts = 0;
+    let max_attempts = 20;
+    let poll_interval_secs = 5;
+
+    loop {
+        attempts += 1;
+        if attempts > max_attempts {
+            bail!("Run {} timed out after {} attempts.", run_id, max_attempts);
+        }
+
+        let run = client
+            .threads()
+            .runs(thread_id)
+            .retrieve(run_id)
+            .await
+            .context(format!("Polling failed: Could not retrieve run {}", run_id))?;
+
+        println!(
+            "Polling Run {}: Status {:?}. (Attempt {}/{})",
+            run_id, run.status, attempts, max_attempts
+        );
+
+        match run.status {
+            RunStatus::Queued | RunStatus::InProgress => {
+                tokio::time::sleep(Duration::from_secs(poll_interval_secs)).await;
+            }
+            RunStatus::Completed => {
+                return Ok(run);
+            }
+            RunStatus::Failed
+            | RunStatus::Incomplete
+            | RunStatus::Cancelled
+            | RunStatus::Expired
+            | RunStatus::RequiresAction
+            | RunStatus::Cancelling => {
+                let error_message = run
+                    .last_error
+                    .map_or("No error details provided.".to_string(), |e| {
+                        format!("Code: {:?}, Message: {:?}", e.code, e.message)
+                    });
+                bail!(
+                    "Run {} ended in terminal state: {:?}. Error: {}",
+                    run_id,
+                    run.status,
+                    error_message
+                );
+            }
+        }
+    }
+}
+
+async fn get_latest_assistant_response(
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+) -> Result<String> {
+    println!(
+        "Retrieving latest assistant message from thread '{}'...",
+        thread_id
+    );
+
+    let messages_response = client
+        .threads()
+        .messages(thread_id)
+        .list(&json!({}))
+        .await
+        .context(format!(
+            "Retrieval failed: Could not list messages for thread {}",
+            thread_id
+        ))?;
+
+    let assistant_message = messages_response
+        .data
+        .iter()
+        .find(|msg| msg.role == MessageRole::Assistant)
+        .context(format!(
+            "Retrieval failed: No assistant message found in recent messages for thread {}",
+            thread_id
+        ))?;
+
+    let text_content = assistant_message
+        .content
+        .iter()
+        .find_map(|part| match part {
+            MessageContent::Text(text_block) => Some(text_block.text.value.clone()),
+            _ => None,
+        })
+        .context("Retrieval failed: Assistant message has no text content")?;
+
+    Ok(text_content)
 }

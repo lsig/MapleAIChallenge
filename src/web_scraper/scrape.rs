@@ -5,10 +5,14 @@ pub async fn crawl_website(url: &str) -> Website {
     let mut website: Website = Website::new(url);
 
     website.configuration.respect_robots_txt = true;
-    website.configuration.delay = 15; // Defaults to 250 ms
+    // website.configuration.delay = 15; // Defaults to 250 ms
     website.configuration.user_agent = Some(Box::new("MapleBot".into()));
 
+    println!("Scraping..");
+
     website.scrape().await;
+
+    println!("Done..");
 
     website
 }
