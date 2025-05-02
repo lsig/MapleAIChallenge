@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::format;
 
 use anyhow::{Context, Result, bail};
 use async_openai::Client;
@@ -11,6 +12,7 @@ use async_openai::types::{
 };
 
 use bytes::Bytes;
+use reqwest::Url;
 use serde_json::json;
 use spider::hashbrown::HashSet;
 use tokio::time::Duration;
@@ -41,11 +43,14 @@ impl Orchestrator {
     }
 
     pub async fn query_url(&mut self, url: &str, query: &str) -> Result<String> {
+        let parsed_url = Url::parse(url).context(format!("Failed to parse URL: '{}'", url))?;
+        let host = parsed_url.domain().unwrap_or("unknown");
+
         let website = crawl_website(url).await;
         let content = parse_website(website).unwrap();
 
         let file = self
-            .upload_content(&format!("{}.txt", url), content)
+            .upload_content(&format!("{}.txt", host), content)
             .await?;
         let thread = self.create_thread().await?;
 

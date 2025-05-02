@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use scraper::{Html, Selector};
 use spider::website::Website;
 
@@ -5,8 +7,13 @@ pub async fn crawl_website(url: &str) -> Website {
     let mut website: Website = Website::new(url);
 
     website.configuration.respect_robots_txt = true;
-    // website.configuration.delay = 15; // Defaults to 250 ms
+    website.configuration.depth_distance = 1;
+    website.configuration.delay = 15; // Defaults to 250 ms
     website.configuration.user_agent = Some(Box::new("MapleBot".into()));
+
+    website
+        .configuration
+        .with_crawl_timeout(Some(Duration::from_secs(5)));
 
     println!("Scraping..");
 
@@ -39,5 +46,9 @@ pub fn parse_website(website: Website) -> Option<String> {
         }
     }
 
-    Some(collected_text)
+    if collected_text.is_empty() {
+        None
+    } else {
+        Some(collected_text)
+    }
 }
