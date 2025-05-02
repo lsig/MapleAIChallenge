@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::{Context, Result, bail};
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
@@ -21,7 +19,6 @@ use crate::web_scraper::scrape::{crawl_website, parse_website};
 pub struct Orchestrator {
     client: Client<OpenAIConfig>,
     assistant_id: String,
-    threads: HashMap<String, String>, // Map threads -> file ids
     files: HashSet<String>,
 }
 
@@ -30,13 +27,11 @@ impl Orchestrator {
         let client = Client::new();
         let assistant = create_assistant(&client, "gpt-3.5-turbo").await?;
         let assistant_id = assistant.id;
-        let threads = HashMap::new();
         let files = HashSet::new();
 
         Ok(Self {
             client,
             assistant_id,
-            threads,
             files,
         })
     }

@@ -1,5 +1,6 @@
 use text_splitter::TextSplitter;
 
+#[allow(dead_code)]
 pub fn content_to_chunks(website_content: &str) -> Vec<String> {
     let size = 512;
     let splitter = TextSplitter::new(size);
