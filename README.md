@@ -9,8 +9,9 @@ a regular LLM, (Hopefully?, Given the context?).
 
 ### How to run
 
+- Make sure you have rust installed (see rustup)
 - Create .env file with your OPENAI_API_KEY in the root directory (not src)
-- cargo run
+- cargo run -- release
 
 Query away.
 
